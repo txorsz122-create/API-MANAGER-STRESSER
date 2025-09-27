@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>API Manager — Enhanced</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    :root{--bg1:#0f2027;--bg2:#203a43;--accent:#00eaff;--accent2:#9c27b0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Poppins',sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2),#2c5364);min-height:100vh;color:#fff;padding:28px}
+    .wrap{max-width:1100px;margin:0 auto}
+    .header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+    h1{color:var(--accent);text-shadow:0 0 8px rgba(0,234,255,.12)}
+    .controls{display:flex;gap:10px;align-items:center}
+    .glass{background:rgba(18,18,26,.6);padding:14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.04)}
+    input,select,button,textarea{font-family:inherit}
+    input[type=text], textarea{background:#0f1720;border:1px solid rgba(0,234,255,.12);color:#fff;padding:10px;border-radius:8px}
+    button.btn{background:linear-gradient(90deg,var(--accent),var(--accent2));border:none;padding:10px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    .manager{margin-top:18px;display:grid;grid-template-columns:360px 1fr;gap:18px}
+
+    /* left column */
+    .left{display:flex;flex-direction:column;gap:12px}
+    .left .add{display:grid;grid-template-columns:1fr auto;gap:8px}
+    .small{font-size:13px;color:#9fb6c7}
+
+    /* right column */
+    .right table{width:100%;border-collapse:collapse}
+    thead th{ text-align:left;padding:12px 10px;background:linear-gradient(90deg,rgba(0,234,255,.04),rgba(156,39,176,.04));font-size:13px;color:#cfeff6 }
+    tbody tr{transition:transform .18s,box-shadow .18s}
+    tbody tr:hover{transform:translateY(-4px);box-shadow:0 10px 30px rgba(0,0,0,.6)}
+    td{padding:12px 10px;border-bottom:1px solid rgba(255,255,255,.02);vertical-align:middle}
+    .status-pill{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:600;font-size:13px}
+    .status-up{background:linear-gradient(90deg,#1ad59b,#00eaff);color:#04131a}
+    .status-down{background:linear-gradient(90deg,#ff6b6b,#ffb86b);color:#2b0a00}
+    .muted{opacity:.7}
+
+    .actions button{margin-right:8px}
+    .search{width:300px}
+
+    /* responsive */
+    @media (max-width:900px){.manager{grid-template-columns:1fr} .search{width:100%}}
+
+    /* subtle snow background */
+    .snow{position:fixed;inset:0;pointer-events:none;z-index:0}
+    .card{position:relative;z-index:1}
+
+    .import-area{min-height:90px;background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.01));padding:10px;border-radius:8px;border:1px dashed rgba(255,255,255,.04);color:#bfeafc}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>API Manager</h1>
+      <div class="controls">
+        <input class="search glass" id="q" type="text" placeholder="Search by host or full URL...">
+        <select id="filterStatus" class="glass">
+          <option value="all">All status</option>
+          <option value="up">Up</option>
+          <option value="down">Down</option>
+        </select>
+        <button class="btn" id="exportBtn">Export</button>
+        <button class="btn" id="importBtn">Import</button>
+      </div>
+    </div>
+
+    <div class="manager">
+      <div class="left glass card">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>Add / Edit API</strong>
+            <small class="small">Supports http://host:port or host:port (will append /api/Admin)</small>
+          </div>
+          <div class="add" style="margin-top:10px">
+            <input id="newApiInput" type="text" placeholder="e.g. 1.2.3.4:8080 or http://1.2.3.4:8080/api/Admin">
+            <button class="btn" id="addBtn">Add</button>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn" id="testAllBtn">Test All</button>
+            <button class="btn" id="clearBtn" style="background:linear-gradient(90deg,#ff6b6b,#ffb86b)">Clear All</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <strong>Import JSON</strong>
+          <div class="import-area" id="importArea" contenteditable="true">Paste JSON array of API URLs here, or click Import button.</div>
+          <small class="small">Each item should be a string URL like "http://1.2.3.4/api/Admin"</small>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" id="doImport">Import Now</button>
+            <button class="btn" id="pasteExample">Example</button>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <strong>Quick Actions</strong>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <button class="btn" id="enableAll">Enable All</button>
+            <button class="btn" id="disableAll">Disable All</button>
+            <button class="btn" id="removeDown">Remove All Down</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="right glass card">
+        <table>
+          <thead>
+            <tr>
+              <th>API URL</th>
+              <th style="width:120px">Status</th>
+              <th style="width:120px">Latency</th>
+              <th style="width:220px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="list"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- small unobtrusive snow canvas -->
+  <canvas class="snow" id="snowCanvas"></canvas>
+
+  <script>
+    // --- Data layer (localStorage) ---
+    const STORAGE_KEY = 'enhancedApiList_v1';
+    let apis = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+    // normalize URL: accept host:port, add http:// and /api/Admin if missing
+    function normalizeApi(input){
+      if(!input) return null;
+      input = input.trim();
+      // if starts with http or https, use as-is
+      if(/^https?:\/\//i.test(input)){
+        if(!/\/api\/Admin$/i.test(input)) input = input.replace(/\/?$/,'') + '/api/Admin';
+        return input;
+      }
+      // else assume host:port
+      const cleaned = input.replace(/\/+$/,'');
+      return `http://${cleaned}/api/Admin`;
+    }
+
+    // save
+    function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(apis)); }
+
+    // render list
+    const listEl = document.getElementById('list');
+    function render(filterQ=''){
+      const q = (document.getElementById('q').value || '').toLowerCase();
+      const statusFilter = document.getElementById('filterStatus').value;
+      listEl.innerHTML = '';
+      apis.forEach((a, idx)=>{
+        if(statusFilter !== 'all' && a.status && statusFilter !== a.status) return;
+        if(q && !(a.url.toLowerCase().includes(q))) return;
+        const tr = document.createElement('tr');
+        const urlTd = document.createElement('td'); urlTd.textContent = a.url; urlTd.title = a.url;
+        const statusTd = document.createElement('td');
+        const latTd = document.createElement('td'); latTd.textContent = a.lat ? a.lat+' ms' : '-';
+        const actionsTd = document.createElement('td'); actionsTd.className='actions';
+
+        const pill = document.createElement('span');
+        pill.className = 'status-pill ' + (a.status==='up' ? 'status-up' : a.status==='down' ? 'status-down' : 'muted');
+        pill.textContent = a.status ? (a.status==='up' ? 'UP' : 'DOWN') : 'UNKNOWN';
+        statusTd.appendChild(pill);
+
+        const testBtn = document.createElement('button'); testBtn.textContent='Test'; testBtn.className='btn';
+        testBtn.onclick = ()=> testApi(idx,true);
+        const editBtn = document.createElement('button'); editBtn.textContent='Edit'; editBtn.className='btn';
+        editBtn.onclick = ()=> editApi(idx);
+        const copyBtn = document.createElement('button'); copyBtn.textContent='Copy'; copyBtn.className='btn';
+        copyBtn.onclick = ()=> navigator.clipboard.writeText(a.url).then(()=> Swal.fire('Copied','API URL copied to clipboard','success'));
+        const delBtn = document.createElement('button'); delBtn.textContent='Remove'; delBtn.className='btn';
+        delBtn.style.background='linear-gradient(90deg,#ff6b6b,#ffb86b)';
+        delBtn.onclick = ()=> removeApi(idx);
+
+        actionsTd.appendChild(testBtn); actionsTd.appendChild(editBtn); actionsTd.appendChild(copyBtn); actionsTd.appendChild(delBtn);
+
+        tr.appendChild(urlTd); tr.appendChild(statusTd); tr.appendChild(latTd); tr.appendChild(actionsTd);
+        listEl.appendChild(tr);
+      })
+    }
+
+    // add api
+    document.getElementById('addBtn').addEventListener('click', ()=>{
+      const raw = document.getElementById('newApiInput').value;
+      const url = normalizeApi(raw);
+      if(!url){ Swal.fire('Error','Please input a valid API host','error'); return; }
+      if(apis.find(x=>x.url===url)){ Swal.fire('Info','API already exists','info'); return; }
+      apis.push({url,status:null,lat:null,enabled:true}); save(); render(); document.getElementById('newApiInput').value='';
+      Swal.fire('Added','API added to list','success');
+    });
+
+    function removeApi(idx){
+      Swal.fire({title:'Remove API?',text:apis[idx].url,icon:'warning',showCancelButton:true}).then(r=>{
+        if(r.isConfirmed){ apis.splice(idx,1); save(); render(); Swal.fire('Removed','API removed','success'); }
+      })
+    }
+
+    function editApi(idx){
+      Swal.fire({
+        title: 'Edit API',
+        input: 'text',
+        inputValue: apis[idx].url,
+        showCancelButton: true
+      }).then(res=>{
+        if(res.isConfirmed){
+          const normalized = normalizeApi(res.value);
+          if(normalized){ apis[idx].url = normalized; save(); render(); Swal.fire('Saved','API updated','success'); }
+          else Swal.fire('Error','Invalid url','error');
+        }
+      })
+    }
+
+    // test single api
+    async function testApi(idx, showToast=false){
+      const api = apis[idx];
+      try{
+        const start = performance.now();
+        const controller = new AbortController();
+        const to = setTimeout(()=>controller.abort(),7000);
+        const res = await fetch(api.url + '?key=Admin&host=example.com&port=80&time=1&method=h2-force',{signal:controller.signal,mode:'no-cors'}).catch(e=>null);
+        clearTimeout(to);
+        const lat = Math.round(performance.now()-start);
+        api.lat = lat;
+        // can't rely on response with no-cors; treat as up if no exception
+        api.status = 'up';
+        save(); render();
+        if(showToast) Swal.fire('Tested', `${api.url}\nLatency: ${lat} ms`, 'success');
+      }catch(err){ api.status='down'; api.lat=null; save(); render(); if(showToast) Swal.fire('Failed', 'Request failed or timed out', 'error'); }
+    }
+
+    // test all
+    document.getElementById('testAllBtn').addEventListener('click', async ()=>{
+      Swal.fire({title:'Testing all APIs',text:'This may take a few seconds',didOpen:()=>{Swal.showLoading()}});
+      for(let i=0;i<apis.length;i++){ await testApi(i,false); }
+      Swal.close(); Swal.fire('Done','All APIs tested','success');
+    });
+
+    // remove all down
+    document.getElementById('removeDown').addEventListener('click', ()=>{});
+    document.getElementById('removeDown').onclick = ()=>{
+      const before = apis.length; apis = apis.filter(x=>x.status!=='down'); save(); render(); Swal.fire('Done',`Removed ${before-apis.length} down APIs`,'success');
+    }
+
+    // enable/disable all
+    document.getElementById('enableAll').addEventListener('click', ()=>{ apis.forEach(a=>a.enabled=true); save(); render(); Swal.fire('Done','All enabled','success'); });
+    document.getElementById('disableAll').addEventListener('click', ()=>{ apis.forEach(a=>a.enabled=false); save(); render(); Swal.fire('Done','All disabled','success'); });
+
+    // clear all
+    document.getElementById('clearBtn').addEventListener('click', ()=>{
+      Swal.fire({title:'Clear all APIs?',icon:'warning',showCancelButton:true}).then(r=>{ if(r.isConfirmed){ apis=[]; save(); render(); Swal.fire('Cleared','','success'); } })
+    });
+
+    // export
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const blob = new Blob([JSON.stringify(apis.map(a=>a.url),null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='apis.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    // import modal
+    document.getElementById('importBtn').addEventListener('click', ()=>{
+      Swal.fire({
+        title:'Import APIs (JSON array of urls)',
+        input:'textarea',
+        inputPlaceholder:'["http://1.2.3.4/api/Admin","http://5.6.7.8/api/Admin"]',
+        inputAttributes:{'aria-label':'Paste json'},
+        showCancelButton:true
+      }).then(res=>{
+        if(res.isConfirmed){ try{ const arr = JSON.parse(res.value); if(Array.isArray(arr)){ arr.forEach(u=>{ const n=normalizeApi(u); if(n && !apis.find(x=>x.url===n)) apis.push({url:n,status:null,lat:null,enabled:true}); }); save(); render(); Swal.fire('Imported','APIs imported','success'); } else Swal.fire('Error','Not an array','error'); }catch(e){ Swal.fire('Error','Invalid JSON','error'); } }
+      })
+    });
+
+    // import area button
+    document.getElementById('doImport').addEventListener('click', ()=>{
+      try{
+        const txt = document.getElementById('importArea').innerText.trim();
+        const arr = JSON.parse(txt);
+        if(!Array.isArray(arr)) throw 1;
+        arr.forEach(u=>{ const n=normalizeApi(u); if(n && !apis.find(x=>x.url===n)) apis.push({url:n,status:null,lat:null,enabled:true}); }); save(); render(); Swal.fire('Imported','APIs imported','success');
+      }catch(e){ Swal.fire('Error','Invalid JSON in import area','error'); }
+    });
+
+    document.getElementById('pasteExample').addEventListener('click', ()=>{
+      const example = JSON.stringify(["http://1.2.3.4/api/Admin","http://5.6.7.8/api/Admin"],null,2);
+      document.getElementById('importArea').innerText = example;
+    });
+
+    // search / filter events
+    document.getElementById('q').addEventListener('input', ()=>render());
+    document.getElementById('filterStatus').addEventListener('change', ()=>render());
+
+    // initial render
+    render();
+
+    // --- lightweight snow effect on canvas ---
+    const canvas = document.getElementById('snowCanvas');
+    const ctx = canvas.getContext('2d');
+    let flakes = [];
+    function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+    onresize = resize; resize();
+    function createFlakes(){ flakes = []; for(let i=0;i<80;i++){ flakes.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*3+1,d:Math.random()*0.5+0.2}); } }
+    createFlakes();
+    function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle='rgba(255,255,255,0.85)'; flakes.forEach(f=>{ ctx.beginPath(); ctx.arc(f.x,f.y,f.r,0,Math.PI*2); ctx.fill(); f.y += f.d + Math.sin(f.x/50)*0.3; f.x += Math.sin(f.y/50)*0.3; if(f.y>canvas.height+5){ f.y = -10; f.x = Math.random()*canvas.width; } }); requestAnimationFrame(draw); }
+    draw();
+
+    // helpful: auto-test on load for previously saved APIs (non-blocking)
+    (async function autoTest(){ for(let i=0;i<apis.length;i++){ try{ await testApi(i,false); }catch(e){} } })();
+  </script>
+</body>
+</html>
